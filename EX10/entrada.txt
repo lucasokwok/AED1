@@ -1,0 +1,32 @@
+9
+-i dir_1 root
+-i dir_2 dir_1
+-i dir_3 dir_2
+-i file_6 root
+-i file_5 root
+-i file_4 dir_3
+-i file_2 dir_1
+-i file_1 dir_1
+-i file_3 dir_2
+file_4
+
+18
+-i dir_1 root
+-i dir_2 dir_1
+-i dir_3 dir_2
+-i file_6 root
+-i file_5 root
+-i file_4 dir_3
+-i file_2 dir_1
+-i file_1 dir_1
+-i file_3 dir_2
+-m file_6 dir_3
+-m file_4 dir_2
+-m file_2 dir_3
+-m file_3 dir_2
+-m file_4 dir_3
+-r file_2
+-r file_4
+-r file_1
+-r file_3
+file_6

@@ -1,0 +1,382 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+// Estrutura da célula
+typedef struct Celula {
+    int valor;
+    struct Celula *cima;
+    struct Celula *baixo;
+    struct Celula *esquerda;
+    struct Celula *direita;
+} Celula;
+
+// Estrutura da planilha
+typedef struct {
+    int linhas;
+    int colunas;
+    Celula *cantoSuperiorEsquerdo; 
+} Planilha;
+
+
+/**
+ * Cria a planilha com "linhas" e "colunas",
+ * alocando e costurando cada célula dinamicamente.
+ */
+Planilha* criarPlanilha(int linhas, int colunas) {
+    if(linhas <= 0 || colunas <= 0) {
+        return NULL;
+    }
+
+    // Alocamos a estrutura da planilha
+    Planilha *p = (Planilha*) malloc(sizeof(Planilha));
+    p->linhas = linhas;
+    p->colunas = colunas;
+    p->cantoSuperiorEsquerdo = NULL;
+
+    // Ponteiro para o início da linha anterior (para costurar verticalmente).
+    Celula *linhaAcima = NULL;
+
+    // Variáveis para percorrer a linha que estamos construindo.
+    Celula *linhaAtual = NULL;     // Ponteiro para a 1ª célula da linha que estamos criando
+    Celula *celulaAnterior = NULL; // Ponteiro para a célula anterior na mesma linha
+
+    for(int i = 0; i < linhas; i++) {
+        // Criar a primeira célula da linha i
+        Celula *primeiraDaLinha = (Celula*) malloc(sizeof(Celula));
+        primeiraDaLinha->valor = 0;
+        primeiraDaLinha->cima = NULL;
+        primeiraDaLinha->baixo = NULL;
+        primeiraDaLinha->esquerda = NULL;
+        primeiraDaLinha->direita = NULL;
+
+        // Se for a primeira linha (i == 0) e primeira coluna, atualizamos cantoSuperiorEsquerdo
+        if(i == 0) {
+            p->cantoSuperiorEsquerdo = primeiraDaLinha;
+        }
+
+        // Costurar verticalmente com a linha de cima (se existir)
+        if(i > 0) {
+            // Precisamos encontrar a célula "acima" para esta primeira coluna
+            // Percorremos linhaAcima horizontalmente até a coluna 0
+            // (Que na verdade é a própria linhaAcima, pois já está na coluna 0)
+            Celula *celulaAcima = linhaAcima;
+            // Liga verticalmente
+            primeiraDaLinha->cima = celulaAcima;
+            celulaAcima->baixo = primeiraDaLinha;
+        }
+
+        // "celulaAnterior" é nula pois estamos começando a linha
+        celulaAnterior = NULL;
+        // "linhaAtual" aponta para a primeira célula criada nesta iteração
+        linhaAtual = primeiraDaLinha;
+
+        // Criar as demais colunas desta linha
+        for(int j = 1; j < colunas; j++) {
+            Celula *nova = (Celula*) malloc(sizeof(Celula));
+            nova->valor = 0;
+            nova->cima = NULL;
+            nova->baixo = NULL;
+            nova->esquerda = NULL;
+            nova->direita = NULL;
+
+            // Liga à esquerda/direita
+            nova->esquerda = linhaAtual;
+            linhaAtual->direita = nova;
+
+            // Costurar verticalmente se não for a primeira linha
+            if(i > 0) {
+                // Precisamos encontrar a célula acima correspondente a (j)
+                // Ela está (j) passos à direita de "linhaAcima"
+                Celula *celulaAcima = linhaAcima;
+                for(int passo = 0; passo < j; passo++) {
+                    if(celulaAcima->direita) {
+                        celulaAcima = celulaAcima->direita;
+                    } else {
+                        break;
+                    }
+                }
+                // Liga vertical
+                nova->cima = celulaAcima;
+                celulaAcima->baixo = nova;
+            }
+
+            // Avança "linhaAtual" para seguir construindo horizontalmente
+            linhaAtual = nova;
+        }
+
+        // Ao final da linha i, atualizamos "linhaAcima" para a 1ª célula da linha que acabamos de criar
+        linhaAcima = primeiraDaLinha;
+    }
+
+    return p;
+}
+
+/**
+ * Função auxiliar que percorre a planilha para liberar cada célula
+ * (para evitar vazamento de memória). Uma maneira simples é:
+ *  - enquanto existirem linhas, chamamos removerLinha(1)
+ *    (ou outra lógica para ir removendo cada linha).
+ * Aqui, optei por implementar explicitamente a varredura
+ * e liberar todas as células sem reaproveitar a função removerLinha.
+ */
+void liberarPlanilha(Planilha *p) {
+    if(!p) return;
+
+    Celula *linha = p->cantoSuperiorEsquerdo;
+    // Percorre cada linha verticalmente
+    while(linha) {
+        Celula *linhaAbaixo = linha->baixo; 
+        // Agora percorremos horizontalmente essa linha, liberando as células
+        Celula *atual = linha;
+        while(atual) {
+            Celula *dir = atual->direita;
+            free(atual);
+            atual = dir;
+        }
+        linha = linhaAbaixo;
+    }
+
+    free(p);
+}
+
+/**
+ * Acessa a célula (linha, coluna), 1-based.
+ * Retorna NULL se for inválida.
+ *
+ * Aqui, para não usar matrizes, percorremos "linha-1" vezes para baixo,
+ * depois "coluna-1" vezes para a direita.
+ */
+Celula* obterCelula(Planilha *p, int linha, int coluna) {
+    if(!p || !p->cantoSuperiorEsquerdo) return NULL;
+    if(linha < 1 || coluna < 1 || linha > p->linhas || coluna > p->colunas) {
+        return NULL;
+    }
+
+    // Anda verticalmente
+    Celula *aux = p->cantoSuperiorEsquerdo;
+    for(int i = 1; i < linha; i++) {
+        if(!aux->baixo) break;
+        aux = aux->baixo;
+    }
+
+    // Anda horizontalmente
+    for(int j = 1; j < coluna; j++) {
+        if(!aux->direita) break;
+        aux = aux->direita;
+    }
+
+    return aux;
+}
+
+/**
+ * Define o valor da célula (linha, coluna).
+ */
+void definirValor(Planilha *p, int linha, int coluna, int valor) {
+    Celula *c = obterCelula(p, linha, coluna);
+    if(c) {
+        c->valor = valor;
+    } else {
+        printf("Coordenada (%d, %d) invalida!\n", linha, coluna);
+    }
+}
+
+/**
+ * Imprime a planilha inteira.
+ */
+void imprimirPlanilha(Planilha *p) {
+    if(!p || !p->cantoSuperiorEsquerdo) {
+        printf("Planilha vazia ou inexistente.\n\n");
+        return;
+    }
+
+    // Percorremos linha por linha (vertical) e em cada linha vamos pra direita
+    Celula *linha = p->cantoSuperiorEsquerdo;
+    for(int i = 1; i <= p->linhas; i++) {
+        Celula *coluna = linha;
+        for(int j = 1; j <= p->colunas; j++) {
+            printf("%4d ", coluna->valor);
+            coluna = coluna->direita; // avança para a próxima coluna
+        }
+        printf("\n");
+        linha = linha->baixo; // desce para a próxima linha
+    }
+    printf("\n");
+}
+
+/**
+ * Remove a linha "linhaParaRemover" inteira.
+ * Ajusta os ponteiros para que as linhas de baixo subam.
+ */
+void removerLinha(Planilha *p, int linhaParaRemover) {
+    if(!p) return;
+    if(linhaParaRemover < 1 || linhaParaRemover > p->linhas) {
+        printf("Linha invalida (%d).\n", linhaParaRemover);
+        return;
+    }
+
+    // Encontrar a primeira célula da linha que será removida
+    Celula *linhaAtual = obterCelula(p, linhaParaRemover, 1);
+    if(!linhaAtual) return;
+
+    // Precisamos do ponteiro para a linha acima (se existir) e abaixo (se existir).
+    Celula *linhaAcima = linhaAtual->cima;   // pode ser NULL se é a 1ª linha
+    Celula *linhaAbaixo = linhaAtual->baixo; // pode ser NULL se é a última linha
+
+    // Percorrer as colunas dessa linha, removendo célula por célula
+    Celula *aux = linhaAtual;
+    while(aux) {
+        // salva a célula da direita para continuar o loop
+        Celula *dir = aux->direita;
+
+        // "descostura" vertical
+        if(aux->cima) {
+            aux->cima->baixo = aux->baixo;
+        }
+        if(aux->baixo) {
+            aux->baixo->cima = aux->cima;
+        }
+
+        // libera a célula
+        free(aux);
+
+        aux = dir;
+    }
+
+    // Se removemos a primeira linha (linhaParaRemover == 1),
+    // é preciso atualizar cantoSuperiorEsquerdo para ser a linhaAbaixo
+    if(linhaParaRemover == 1) {
+        p->cantoSuperiorEsquerdo = linhaAbaixo;
+    }
+
+    p->linhas--;
+    // Se agora a planilha ficou com 0 linhas, p->cantoSuperiorEsquerdo deve ser NULL
+    if(p->linhas == 0) {
+        p->cantoSuperiorEsquerdo = NULL;
+    }
+}
+
+/**
+ * Remove a coluna "colunaParaRemover" inteira.
+ * Ajusta os ponteiros para que as colunas da direita venham para a esquerda.
+ */
+void removerColuna(Planilha *p, int colunaParaRemover) {
+    if(!p) return;
+    if(colunaParaRemover < 1 || colunaParaRemover > p->colunas) {
+        printf("Coluna invalida (%d).\n", colunaParaRemover);
+        return;
+    }
+
+    // Precisamos percorrer cada linha, acessar a célula da coluna a ser removida e liberá-la.
+    // Ponto inicial: a célula (1, colunaParaRemover) (se existir).
+    // Depois descemos linha a linha (até p->linhas).
+    // Para cada célula nessa coluna, descosturamos e damos free.
+
+    // Primeiro, vamos até a célula (1, colunaParaRemover).
+    Celula *cabecalhoColuna = obterCelula(p, 1, colunaParaRemover);
+    if(!cabecalhoColuna) return;
+
+    // Vamos descer (para cada linha), removendo a célula desta coluna.
+    Celula *cel = cabecalhoColuna;
+    for(int i = 1; i <= p->linhas; i++) {
+        // Se por algum motivo cel for NULL, paramos
+        if(!cel) break;
+
+        // Salva a célula de baixo (para continuar o loop)
+        Celula *celAbaixo = cel->baixo;
+
+        // "descostura" horizontal
+        if(cel->esquerda) {
+            cel->esquerda->direita = cel->direita;
+        }
+        if(cel->direita) {
+            cel->direita->esquerda = cel->esquerda;
+        }
+
+        // libera a célula da coluna
+        free(cel);
+
+        cel = celAbaixo;
+    }
+
+    // Se removemos a primeira coluna (colunaParaRemover == 1),
+    // é preciso atualizar cantoSuperiorEsquerdo para ser a colunaDaDireita da célula [1,1].
+    if(colunaParaRemover == 1) {
+        // O novo cantoSuperiorEsquerdo será a antiga (1,2), que agora pode ser a (1,1),
+        // mas vamos pegar o que restou após a primeira linha ser reencadeada.
+        if(p->cantoSuperiorEsquerdo) {
+            // Pode ter sido já removido se só havia uma coluna.
+            // Então tentamos apontar para a "direita" do antigo cantoSuperiorEsquerdo.
+            Celula *novo = p->cantoSuperiorEsquerdo;
+            // Se a planilha ainda tiver colunas, "direita" deve existir
+            if(novo) {
+                novo = novo->direita;
+                p->cantoSuperiorEsquerdo = novo;
+            }
+        }
+    }
+
+    p->colunas--;
+    // Se a planilha ficou com 0 colunas, então também não tem nenhuma célula
+    if(p->colunas == 0) {
+        p->cantoSuperiorEsquerdo = NULL;
+        p->linhas = 0; // pois não existem mais células
+    }
+}
+
+// Função principal de exemplo
+int main() {
+    int opcao, lin, col, valor;
+
+    // Cria, por exemplo, uma planilha 5x5
+    Planilha *plan = criarPlanilha(5, 5);
+    if(!plan) {
+        printf("Erro ao criar planilha.\n");
+        return 1;
+    }
+
+    while(1) {
+        printf("Menu:\n");
+        printf("1 - Inserir valor em (linha, coluna)\n");
+        printf("2 - Remover linha\n");
+        printf("3 - Remover coluna\n");
+        printf("4 - Imprimir planilha\n");
+        printf("0 - Sair\n");
+        printf("Escolha: ");
+        scanf("%d", &opcao);
+
+        switch(opcao) {
+            case 1:
+                printf("Digite: linha coluna valor -> ");
+                scanf("%d %d %d", &lin, &col, &valor);
+                definirValor(plan, lin, col, valor);
+                break;
+
+            case 2:
+                printf("Digite o numero da linha a remover: ");
+                scanf("%d", &lin);
+                removerLinha(plan, lin);
+                break;
+
+            case 3:
+                printf("Digite o numero da coluna a remover: ");
+                scanf("%d", &col);
+                removerColuna(plan, col);
+                break;
+
+            case 4:
+                imprimirPlanilha(plan);
+                break;
+
+            case 0:
+                printf("Saindo...\n");
+                liberarPlanilha(plan);
+                return 0;
+
+            default:
+                printf("Opcao invalida!\n");
+                break;
+        }
+    }
+
+    return 0;
+}

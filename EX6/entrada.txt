@@ -1,0 +1,4 @@
+3 10
+arara1
+banana1
+radar
